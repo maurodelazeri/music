@@ -10,7 +10,7 @@ import AVFoundation
 import Alamofire
 import SwiftyJSON
 
-class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate, UITableViewDataSource, doubanFMProtocol {
+class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate, UITableViewDataSource {
     var player:AVAudioPlayer!
     //private var fileName = "xiaopingguo.mp3"
     var filePath = "/Users/Soung/Desktop/"
@@ -33,9 +33,9 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        doubanChannel.delegate = self
-        doubanChannel.getPlayList("1")
-        
+        //doubanChannel.delegate = self
+        //getPlayList("1")
+        self.getChannelList()
         nowPlaying.text = "musicPlayer"
     }
     override func viewWillAppear(animated: Bool) {
@@ -51,12 +51,12 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
     }
     
     
-    
+    //player func
     func startPlayer(url:String) {
         var errMsg = NSErrorPointer()
         player = AVAudioPlayer(contentsOfURL: NSURL(string: url), error: errMsg)
         //player.numberOfLoops = 1 //-1 循环
-        player.volume = 0.2 // vplume 0~1
+        player.volume = 0.5 // vplume 0~1
         player.prepareToPlay()
         player.delegate = self
         
@@ -105,6 +105,8 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
         progressSlider.value = CFloat(player.currentTime)
     }
     
+    
+    
     //player control
     @IBAction func playMode(sender: AnyObject) {
         if(player == nil) {
@@ -128,7 +130,55 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
         player.currentTime = NSTimeInterval(sender.value) // * player.duration
     }
     
-    //display playlist
+    @IBAction func reset2ChannelList(sender: AnyObject) {
+        self.getChannelList()
+    }
+    
+    
+    
+    
+    
+    
+    //on line resource
+    func getChannelList(){
+        if(self.playListJSON["channels"].count == 0){
+            var doubanChannelUrl = "http://www.douban.com/j/app/radio/channels"
+            Alamofire.request(.GET, doubanChannelUrl).responseJSON {
+                (request, response, data, error) -> Void in
+                if(data == nil){
+                    println(error)
+                    return
+                }
+                self.playListJSON = JSON(data!)
+                //刷新
+                self.playList.reloadData()
+            }
+        }
+    }
+    func getPlayList(channel_id:String){
+        var listUrl = "http://douban.fm/j/mine/playlist?channel=" + channel_id
+        Alamofire.request(.GET, listUrl).responseJSON {
+            (request, response, data, error) -> Void in
+            if(data == nil){
+                println(error)
+                return
+            }
+            self.playListJSON = JSON(data!)
+            self.playList.reloadData()
+        }
+    }
+    func playOnlineMusic(url:String){
+        if (url.hasPrefix("http") == true) {
+            downloadData(url, dataHandler: {
+                (data:NSData) -> Void in
+                var musicUrl = self.filePath + "test" + ".mp3"
+                data.writeToFile(musicUrl, atomically: true)
+                self.startPlayer(musicUrl)
+            })
+        }
+
+    }
+    
     func downloadData(url: String, dataHandler:(NSData) -> Void){
         var request = NSURLRequest(URL: NSURL(string: url)!)  //請求的內容
         //異步請求,//操作隊列
@@ -143,11 +193,19 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
             }
         })
     }
+    
+    
+    
+    //display playlist
     func numberOfSectionsInTableView(tableView: UITableView) -> Int {
         return 1
     }
     func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return self.playListJSON["song"].count
+        if (self.playListJSON["channels"].count > 0){
+            return self.playListJSON["channels"].count
+        }else{
+            return self.playListJSON["song"].count
+        }
     }
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cellIdentifer = "playListCell"
@@ -156,8 +214,14 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
             cell = UITableViewCell(style: UITableViewCellStyle.Default, reuseIdentifier: cellIdentifer)
             cell?.accessoryType = UITableViewCellAccessoryType.DisclosureIndicator
         }
-        cell?.textLabel?.text = self.playListJSON["song"][indexPath.row]["title"].string
-        cell?.detailTextLabel?.text = self.playListJSON["song"][indexPath.row]["albumtitle"].string
+        if (self.playListJSON["channels"].count > 0){
+            cell?.textLabel?.text = self.playListJSON["channels"][indexPath.row]["name"].string
+            cell?.detailTextLabel?.text = self.playListJSON["channels"][indexPath.row]["name_en"].string
+        }else{
+            cell?.textLabel?.text = self.playListJSON["song"][indexPath.row]["title"].string
+            cell?.detailTextLabel?.text = self.playListJSON["song"][indexPath.row]["albumtitle"].string
+
+        }
         return cell!
     }
     func tableView(tableView: UITableView, willDisplayCell cell: UITableViewCell, forRowAtIndexPath indexPath: NSIndexPath) {
@@ -167,23 +231,11 @@ class musicPlayer: UIViewController, AVAudioPlayerDelegate, UITableViewDelegate,
         })
     }
     func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
-        //play music
-        var url = playListJSON["song"][indexPath.row]["url"].string!
-        if (url.hasPrefix("http") == true) {
-            //Alamofire.request(.GET, url).response({ (reuqest, response, data, error) -> Void in
-            //NSData(data: NSData())
-            //var music = data as NSData
-            //music.writeToFile(self.filePath + self.playListJSON["song"][indexPath.row]["title"].string!, atomically: true)
-            //})
-            //playMusic(self.filePath + self.playListJSON["song"][indexPath.row]["title"].string!)
-            downloadData(url, dataHandler: {
-                (data:NSData) -> Void in
-                var musicUrl = self.filePath + "test" + ".mp3"
-                data.writeToFile(musicUrl, atomically: true)
-                self.startPlayer(musicUrl)
-            })
+        if (self.playListJSON["channels"].count > 0){
+            self.getPlayList(self.playListJSON["channels"][indexPath.row]["channel_id"].string!)
+        }else{
+            self.playOnlineMusic(playListJSON["song"][indexPath.row]["url"].string!)
         }
-        
     }
 }
 
