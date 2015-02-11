@@ -6,3 +6,6 @@ This is a music application of Alamofire and SwiftJSON
 - download music data and picture
 - play music,display picture, slider,timming
 - auto download & play nex
+
+
+![demo](https://raw.githubusercontent.com/DingSoung/music/master/demo.gif)
