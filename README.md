@@ -8,4 +8,4 @@ This is a music application of Alamofire and SwiftJSON
 - auto download & play nex
 
 
-![demo](https://raw.githubusercontent.com/DingSoung/music/master/demo.gif)
+![demo](https://raw.githubusercontent.com/DingSoung/music/master/demo.png)
